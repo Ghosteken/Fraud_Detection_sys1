@@ -1,0 +1,36 @@
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# IDE/editor folders
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and data
+*.log
+*.csv
+*.db
+*.sqlite3
+
+# Environment variables
+.env
+
+# Model and cache files
+*.jb
+*.pkl
+*.h5
+*.joblib
+.cache/
