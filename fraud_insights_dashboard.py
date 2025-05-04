@@ -9,16 +9,13 @@ data = pd.DataFrame({
     "Total Transactions": [120, 80, 40, 35]
 })
 
-# Calculate fraud rate
 data["Fraud Rate (%)"] = (data["Fraud Cases"] / data["Total Transactions"]) * 100
 
-st.title("📊 Real Estate Fraud Insights Dashboard")
+st.title("Real Estate Fraud Insights Dashboard")
 
-# Section 1: Bar chart of fraud cases
 st.subheader("Fraud Cases by Property Type")
 st.bar_chart(data.set_index("Property Type")["Fraud Cases"])
 
-# Section 2: Pie chart of fraud case distribution
 st.subheader("Fraud Distribution Pie Chart")
 fig1, ax1 = plt.subplots()
 ax1.pie(data["Fraud Cases"], labels=data["Property Type"], autopct="%1.1f%%", startangle=90,
@@ -26,11 +23,9 @@ ax1.pie(data["Fraud Cases"], labels=data["Property Type"], autopct="%1.1f%%", st
 ax1.axis("equal")
 st.pyplot(fig1)
 
-# Section 3: Fraud Rate Line Chart
 st.subheader("Fraud Rate (%) by Property Type")
 st.line_chart(data.set_index("Property Type")["Fraud Rate (%)"])
 
-# Section 4: Table
 st.subheader("Fraud Summary Table")
 st.dataframe(data.style.highlight_max(axis=0, color='lightgreen'))
 
@@ -43,7 +38,7 @@ monthly_data = pd.DataFrame({
 st.area_chart(monthly_data)
 
 st.markdown("---")
-st.markdown("🔍 _This dashboard shows simulated insights. Replace with real data for production use._")
+st.markdown("🔍 _This dashboard shows simulated insights.")
 
 # streamlit run fraud_insights_dashboard.py
 
