@@ -19,7 +19,6 @@ property_type = st.selectbox("Property Type", ["Residential", "Commercial", "Ind
 property_value = st.number_input("Property Value (USD)", min_value=1000.0, format="%.2f")
 mortgage_amount = st.number_input("Mortgage Amount (USD)", min_value=0.0, format="%.2f")
 
-
 location_lat = st.number_input("Property Latitude", min_value=-90.0, max_value=90.0, format="%.6f")
 location_long = st.number_input("Property Longitude", min_value=-180.0, max_value=180.0, format="%.6f")
 buyer_lat = st.number_input("Buyer Address Latitude", min_value=-90.0, max_value=90.0, format="%.6f")
@@ -28,7 +27,6 @@ buyer_long = st.number_input("Buyer Address Longitude", min_value=-180.0, max_va
 month = st.slider("Transaction Month", 1, 12, 6)
 buyer_gender = st.selectbox("Buyer Gender", ["Male", "Female"])
 ssn = st.text_input("Buyer's SSN (last 4 digits)")
-
 
 distance = None
 if all(-90 <= lat <= 90 for lat in [location_lat, buyer_lat]) and \
@@ -49,13 +47,9 @@ if st.button("Check for Fraud"):
 
         categorical_cols = ['buyer_name', 'seller_name', 'property_type', 'buyer_gender']
         for col in categorical_cols:
-            if col in encoder:
-                try:
-                    input_data[col] = encoder[col].transform(input_data[col])
-                except ValueError:
-                    input_data[col] = -1
-            else:
-                st.warning(f"No encoder found for column: {col}. Using fallback hash.")
+            try:
+                input_data[col] = encoder[col].transform(input_data[col])
+            except (KeyError, ValueError):
                 input_data[col] = input_data[col].apply(lambda x: hash(x) % 1000)
 
         input_data['ssn'] = input_data['ssn'].apply(lambda x: hash(x) % 10000)
@@ -65,3 +59,6 @@ if st.button("Check for Fraud"):
         st.subheader(f"Prediction: {result}")
     else:
         st.error("Please fill all required fields correctly.")
+
+
+# streamlit run app.py
