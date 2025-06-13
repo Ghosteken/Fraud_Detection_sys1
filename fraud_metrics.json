@@ -1,0 +1,90 @@
+{
+    "metrics": {
+        "distance_check": {
+            "name": "Distance Between Buyer and Property",
+            "threshold": 50,
+            "unit": "km",
+            "description": "In Nigeria, properties are typically purchased within reasonable distance from buyer's location. Large distances may indicate potential fraud.",
+            "risk_level": "high",
+            "nigerian_context": "Nigerian property transactions usually occur within the same state or neighboring states. Cross-country transactions are rare and require additional verification."
+        },
+        "property_value_check": {
+            "name": "Property Value Assessment",
+            "threshold": 50000000,
+            "unit": "NGN",
+            "description": "Property values significantly above market rates for the area may indicate price inflation or fraud.",
+            "risk_level": "medium",
+            "nigerian_context": "Property values in Nigeria vary significantly by location. Lagos and Abuja have higher property values compared to other states."
+        },
+        "mortgage_ratio_check": {
+            "name": "Mortgage to Value Ratio",
+            "threshold": 0.8,
+            "unit": "ratio",
+            "description": "High mortgage-to-value ratios may indicate risky financing or potential fraud.",
+            "risk_level": "high",
+            "nigerian_context": "Nigerian banks typically require 20-30% down payment. Mortgages above 80% of property value are unusual."
+        },
+        "transaction_timing_check": {
+            "name": "Transaction Timing",
+            "threshold": 30,
+            "unit": "days",
+            "description": "Unusually quick transactions may indicate rushed fraudulent deals.",
+            "risk_level": "medium",
+            "nigerian_context": "Property transactions in Nigeria typically take 45-90 days to complete due to verification processes."
+        },
+        "price_per_sqm_check": {
+            "name": "Price per Square Meter",
+            "threshold": 500000,
+            "unit": "NGN/sqm",
+            "description": "Unusually high price per square meter compared to area average.",
+            "risk_level": "medium",
+            "nigerian_context": "Price per square meter varies by location: Lagos (300,000-500,000 NGN), Abuja (250,000-450,000 NGN), Other states (100,000-300,000 NGN)"
+        },
+        "document_verification_check": {
+            "name": "Document Verification",
+            "required_documents": [
+                "Certificate of Occupancy",
+                "Deed of Assignment",
+                "Survey Plan",
+                "Tax Clearance",
+                "Bank Statement"
+            ],
+            "description": "Missing or invalid property documents may indicate fraud.",
+            "risk_level": "high",
+            "nigerian_context": "All property transactions in Nigeria require specific documentation. Missing documents are a major red flag."
+        },
+        "buyer_history_check": {
+            "name": "Buyer Transaction History",
+            "threshold": 3,
+            "unit": "transactions",
+            "description": "First-time buyers with high-value transactions may require additional verification.",
+            "risk_level": "medium",
+            "nigerian_context": "First-time property buyers in Nigeria typically start with lower-value properties."
+        },
+        "location_risk_check": {
+            "name": "Location Risk Assessment",
+            "high_risk_areas": [
+                "Areas with disputed land ownership",
+                "Areas with recent government acquisition notices",
+                "Areas with known title issues"
+            ],
+            "description": "Properties in high-risk areas require additional verification.",
+            "risk_level": "high",
+            "nigerian_context": "Certain areas in Nigeria have known issues with land ownership and documentation."
+        }
+    },
+    "risk_levels": {
+        "high": {
+            "weight": 3,
+            "description": "Immediate attention required"
+        },
+        "medium": {
+            "weight": 2,
+            "description": "Additional verification recommended"
+        },
+        "low": {
+            "weight": 1,
+            "description": "Standard verification sufficient"
+        }
+    }
+} 

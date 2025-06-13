@@ -8,6 +8,8 @@ from geopy.distance import geodesic
 import json
 import os
 from datetime import datetime
+import shutil
+from pathlib import Path
 
 
 if 'authenticated' not in st.session_state:
@@ -16,13 +18,91 @@ if 'current_user' not in st.session_state:
     st.session_state.current_user = None
 if 'is_admin' not in st.session_state:
     st.session_state.is_admin = False
+if 'uploaded_documents' not in st.session_state:
+    st.session_state.uploaded_documents = {}
 
 # admin credentials
 VALID_USERNAME = "admin"
 VALID_PASSWORD = "admin123"
 
-# User data file
+# File paths
 USERS_FILE = "users.json"
+FRAUD_METRICS_FILE = "fraud_metrics.json"
+CHECKS_HISTORY_FILE = "fraud_checks_history.json"
+UPLOADS_DIR = "document_uploads"
+
+# Create uploads directory if it doesn't exist
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+# Load fraud metrics
+def load_fraud_metrics():
+    with open(FRAUD_METRICS_FILE, 'r') as f:
+        return json.load(f)
+
+# Save check history
+def save_check_history(check_data):
+    if os.path.exists(CHECKS_HISTORY_FILE):
+        with open(CHECKS_HISTORY_FILE, 'r') as f:
+            history = json.load(f)
+    else:
+        history = []
+    
+    history.append(check_data)
+    
+    with open(CHECKS_HISTORY_FILE, 'w') as f:
+        json.dump(history, f, indent=4)
+
+# Document handling functions
+def save_uploaded_file(uploaded_file, transaction_id, document_type):
+    """Save uploaded document with proper naming and organization"""
+    if uploaded_file is not None:
+        # Create transaction directory
+        transaction_dir = os.path.join(UPLOADS_DIR, transaction_id)
+        os.makedirs(transaction_dir, exist_ok=True)
+        
+        # Save file with proper extension
+        file_extension = Path(uploaded_file.name).suffix
+        file_path = os.path.join(transaction_dir, f"{document_type}{file_extension}")
+        
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        
+        return file_path
+    return None
+
+def verify_document(file_path):
+    """Basic document verification (can be enhanced with actual document verification logic)"""
+    if file_path and os.path.exists(file_path):
+        # Get file size
+        file_size = os.path.getsize(file_path)
+        
+        # Basic checks
+        is_valid = True
+        issues = []
+        
+        # Check file size (max 10MB)
+        if file_size > 10 * 1024 * 1024:
+            is_valid = False
+            issues.append("File size exceeds 10MB limit")
+        
+        # Check file extension
+        allowed_extensions = ['.pdf', '.jpg', '.jpeg', '.png']
+        if not any(file_path.lower().endswith(ext) for ext in allowed_extensions):
+            is_valid = False
+            issues.append("Invalid file format. Allowed formats: PDF, JPG, JPEG, PNG")
+        
+        return {
+            "is_valid": is_valid,
+            "issues": issues,
+            "file_size": file_size,
+            "file_path": file_path
+        }
+    return {
+        "is_valid": False,
+        "issues": ["No file uploaded"],
+        "file_size": 0,
+        "file_path": None
+    }
 
 # Load or create users file
 def load_users():
@@ -105,7 +185,7 @@ with st.sidebar:
 if st.session_state.is_admin:
     st.title("👑 Admin Dashboard")
     
-    admin_tab1, admin_tab2, admin_tab3 = st.tabs(["User Management", "Fraud Analysis", "System Settings"])
+    admin_tab1, admin_tab2, admin_tab3, admin_tab4 = st.tabs(["User Management", "Fraud Analysis", "System Settings", "Fraud Metrics"])
     
     with admin_tab1:
         st.header("User Management")
@@ -178,6 +258,25 @@ if st.session_state.is_admin:
             st.success("✅ Encoders are loaded successfully")
         except Exception as e:
             st.error(f"❌ System Error: {str(e)}")
+    
+    with admin_tab4:
+        st.header("Fraud Detection Metrics")
+        metrics = load_fraud_metrics()
+        
+        for metric_id, metric in metrics["metrics"].items():
+            with st.expander(f"{metric['name']} ({metric['risk_level'].upper()})"):
+                st.write("**Description:**", metric["description"])
+                st.write("**Nigerian Context:**", metric["nigerian_context"])
+                if "threshold" in metric:
+                    st.write("**Threshold:**", f"{metric['threshold']} {metric['unit']}")
+                if "required_documents" in metric:
+                    st.write("**Required Documents:**")
+                    for doc in metric["required_documents"]:
+                        st.write(f"- {doc}")
+                if "high_risk_areas" in metric:
+                    st.write("**High Risk Areas:**")
+                    for area in metric["high_risk_areas"]:
+                        st.write(f"- {area}")
 
 # Main Application
 else:
@@ -193,17 +292,81 @@ else:
         buyer_name = st.text_input("Buyer Name")
         seller_name = st.text_input("Seller Name")
         property_type = st.selectbox("Property Type", ["Residential", "Commercial", "Industrial", "Land"])
-        property_value = st.number_input("Property Value (USD)", min_value=1000.0, format="%.2f")
-        mortgage_amount = st.number_input("Mortgage Amount (USD)", min_value=0.0, format="%.2f")
+        property_value = st.number_input("Property Value (NGN)", min_value=1000000.0, format="%.2f")
+        mortgage_amount = st.number_input("Mortgage Amount (NGN)", min_value=0.0, format="%.2f")
+        property_size = st.number_input("Property Size (sqm)", min_value=1.0, format="%.2f")
 
         location_lat = st.number_input("Property Latitude", min_value=-90.0, max_value=90.0, format="%.6f")
         location_long = st.number_input("Property Longitude", min_value=-180.0, max_value=180.0, format="%.6f")
         buyer_lat = st.number_input("Buyer Address Latitude", min_value=-90.0, max_value=90.0, format="%.6f")
         buyer_long = st.number_input("Buyer Address Longitude", min_value=-180.0, max_value=180.0, format="%.6f")
 
-        month = st.slider("Transaction Month", 1, 12, 6)
+        transaction_days = st.number_input("Transaction Processing Time (days)", min_value=1, value=45)
         buyer_gender = st.selectbox("Buyer Gender", ["Male", "Female"])
         ssn = st.text_input("Buyer's SSN (last 4 digits)")
+
+        # Document upload section
+        st.subheader("Required Documents")
+        metrics = load_fraud_metrics()
+        required_docs = metrics["metrics"]["document_verification_check"]["required_documents"]
+        
+        # Document selection
+        st.write("Select documents to upload:")
+        selected_docs = st.multiselect(
+            "Choose documents",
+            options=required_docs,
+            default=[],
+            help="Select one or more documents to upload"
+        )
+        
+        # Document upload interface
+        uploaded_files = {}
+        document_status = {}
+        
+        if selected_docs:
+            st.write("---")
+            st.write("Upload selected documents:")
+            
+            # Create columns for document upload
+            cols = st.columns(2)
+            for idx, doc in enumerate(selected_docs):
+                with cols[idx % 2]:
+                    st.write(f"**{doc}**")
+                    uploaded_file = st.file_uploader(
+                        f"Upload {doc}",
+                        type=['pdf', 'jpg', 'jpeg', 'png'],
+                        key=f"upload_{doc}"
+                    )
+                    
+                    if uploaded_file is not None:
+                        # Generate unique transaction ID
+                        transaction_id = f"{buyer_name}_{seller_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                        
+                        # Save and verify document
+                        file_path = save_uploaded_file(uploaded_file, transaction_id, doc)
+                        verification_result = verify_document(file_path)
+                        
+                        uploaded_files[doc] = file_path
+                        document_status[doc] = verification_result
+                        
+                        if verification_result["is_valid"]:
+                            st.success("✅ Document uploaded and verified successfully")
+                        else:
+                            st.error("❌ Document verification failed:")
+                            for issue in verification_result["issues"]:
+                                st.write(f"- {issue}")
+        
+        # Show upload status
+        if uploaded_files:
+            st.write("---")
+            st.subheader("Upload Status")
+            for doc, status in document_status.items():
+                if status["is_valid"]:
+                    st.success(f"✅ {doc}: Uploaded and verified")
+                else:
+                    st.error(f"❌ {doc}: Failed verification")
+                    for issue in status["issues"]:
+                        st.write(f"- {issue}")
 
         distance = None
         if all(-90 <= lat <= 90 for lat in [location_lat, buyer_lat]) and \
@@ -214,38 +377,123 @@ else:
 
         if st.button("Check for Fraud"):
             if buyer_name and seller_name and ssn and distance is not None:
-                input_data = pd.DataFrame([[buyer_name, seller_name, property_type, property_value, mortgage_amount,
-                                            distance, month, buyer_gender, ssn]],
-                                          columns=['buyer_name', 'seller_name', 'property_type', 'property_value',
-                                                   'mortgage_amount', 'distance', 'month', 'buyer_gender', 'ssn'])
-
-                categorical_cols = ['buyer_name', 'seller_name', 'property_type', 'buyer_gender']
-                for col in categorical_cols:
-                    try:
-                        input_data[col] = encoder[col].transform(input_data[col])
-                    except (KeyError, ValueError):
-                        input_data[col] = input_data[col].apply(lambda x: hash(x) % 1000)
-
-                input_data['ssn'] = input_data['ssn'].apply(lambda x: hash(x) % 10000)
-
-                prediction = model.predict(input_data)[0]
-                result = "🚨 Fraudulent Transaction" if prediction == 1 else "✅ Legitimate Transaction"
-                st.subheader(f"Prediction: {result}")
+                # Load fraud metrics
+                metrics = load_fraud_metrics()
                 
-                # Add fraud analysis details
-                if prediction == 1:
-                    st.warning("Potential Fraud Indicators:")
-                    if distance > 100:
-                        st.write("⚠️ Large distance between buyer and property location")
-                    if mortgage_amount > property_value * 0.9:
-                        st.write("⚠️ High mortgage-to-value ratio")
-                    if property_value > 1000000:
-                        st.write("⚠️ High-value property transaction")
+                # Perform checks
+                checks = {
+                    "timestamp": datetime.now().isoformat(),
+                    "buyer_name": buyer_name,
+                    "seller_name": seller_name,
+                    "property_type": property_type,
+                    "checks": {},
+                    "documents": {}
+                }
+                
+                # Document verification
+                all_docs_valid = True
+                for doc in required_docs:
+                    if doc in document_status:
+                        status = document_status[doc]
+                        checks["documents"][doc] = {
+                            "is_valid": status["is_valid"],
+                            "issues": status["issues"],
+                            "file_path": status["file_path"]
+                        }
+                        if not status["is_valid"]:
+                            all_docs_valid = False
+                    else:
+                        checks["documents"][doc] = {
+                            "is_valid": False,
+                            "issues": ["Document not uploaded"],
+                            "file_path": None
+                        }
+                        all_docs_valid = False
+                
+                # Distance check
+                checks["checks"]["distance"] = {
+                    "value": distance,
+                    "threshold": metrics["metrics"]["distance_check"]["threshold"],
+                    "passed": distance <= metrics["metrics"]["distance_check"]["threshold"]
+                }
+                
+                # Property value check
+                checks["checks"]["property_value"] = {
+                    "value": property_value,
+                    "threshold": metrics["metrics"]["property_value_check"]["threshold"],
+                    "passed": property_value <= metrics["metrics"]["property_value_check"]["threshold"]
+                }
+                
+                # Mortgage ratio check
+                mortgage_ratio = mortgage_amount / property_value if property_value > 0 else 0
+                checks["checks"]["mortgage_ratio"] = {
+                    "value": mortgage_ratio,
+                    "threshold": metrics["metrics"]["mortgage_ratio_check"]["threshold"],
+                    "passed": mortgage_ratio <= metrics["metrics"]["mortgage_ratio_check"]["threshold"]
+                }
+                
+                # Transaction timing check
+                checks["checks"]["transaction_timing"] = {
+                    "value": transaction_days,
+                    "threshold": metrics["metrics"]["transaction_timing_check"]["threshold"],
+                    "passed": transaction_days >= metrics["metrics"]["transaction_timing_check"]["threshold"]
+                }
+                
+                # Price per sqm check
+                price_per_sqm = property_value / property_size if property_size > 0 else 0
+                checks["checks"]["price_per_sqm"] = {
+                    "value": price_per_sqm,
+                    "threshold": metrics["metrics"]["price_per_sqm_check"]["threshold"],
+                    "passed": price_per_sqm <= metrics["metrics"]["price_per_sqm_check"]["threshold"]
+                }
+                
+                # Document verification check
+                checks["checks"]["document_verification"] = {
+                    "value": all_docs_valid,
+                    "passed": all_docs_valid
+                }
+                
+                # Save checks to history
+                save_check_history(checks)
+                
+                # Calculate risk score
+                risk_score = 0
+                for check in checks["checks"].values():
+                    if not check["passed"]:
+                        metric_id = next(k for k, v in metrics["metrics"].items() 
+                                      if v["threshold"] == check.get("threshold"))
+                        risk_score += metrics["risk_levels"][metrics["metrics"][metric_id]["risk_level"]]["weight"]
+                
+                # Display results
+                st.subheader("Fraud Detection Results")
+                
+                if risk_score >= 5:
+                    st.error("🚨 High Risk Transaction")
+                elif risk_score >= 3:
+                    st.warning("⚠️ Medium Risk Transaction")
                 else:
-                    st.success("Transaction appears legitimate based on:")
-                    st.write("✅ Normal distance between buyer and property")
-                    st.write("✅ Reasonable mortgage-to-value ratio")
-                    st.write("✅ Standard property value range")
+                    st.success("✅ Low Risk Transaction")
+                
+                st.subheader("Detailed Check Results")
+                for check_name, check_result in checks["checks"].items():
+                    metric = next(m for m in metrics["metrics"].values() if m["name"].lower().replace(" ", "_") == check_name)
+                    if not check_result["passed"]:
+                        st.error(f"❌ {metric['name']}")
+                        st.write(f"Reason: {metric['description']}")
+                        st.write(f"Nigerian Context: {metric['nigerian_context']}")
+                    else:
+                        st.success(f"✅ {metric['name']}")
+                
+                # Display document verification results
+                st.subheader("Document Verification Results")
+                for doc, status in checks["documents"].items():
+                    if status["is_valid"]:
+                        st.success(f"✅ {doc}: Verified")
+                    else:
+                        st.error(f"❌ {doc}: Failed")
+                        for issue in status["issues"]:
+                            st.write(f"- {issue}")
+                
             else:
                 st.error("Please fill all required fields correctly.")
 
